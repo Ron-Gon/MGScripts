@@ -7,7 +7,7 @@
 // @match        https://magiccircle.gg/r/*
 // @match        https://magicgarden.gg/r/*
 // @match        https://starweaver.org/r/*
-// @grant        GM_xmlhttpRequest
+// @grant        none
 // @uploadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS.user.js
 // @downloadURL  https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS.user.js
 // ==/UserScript==
