@@ -8,8 +8,8 @@
 // @match        https://magicgarden.gg/r/*
 // @match        https://starweaver.org/r/*
 // @grant        none
-// @uploadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS01.js
-// @downloadURL  https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS01.js
+// @uploadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS.js
+// @downloadURL  https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS.js
 // ==/UserScript==
 
 (function () {
