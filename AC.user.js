@@ -14,7 +14,7 @@
 
 (function () {
   // CONFIGURATION
-  const CLICK_INTERVAL = 10000; // Delay in milliseconds (1000 = 1 sec)
+  const CLICK_INTERVAL = 600000; // Delay in milliseconds (1000 = 1 sec)
 
   let clickTimer = null;
   let isActive = false;
