@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Autoclicker
-// @namespace    Violentmonkey
+// @namespace    violentmonkey
 // @match        https://magiccircle.gg/r/*
 // @match        https://magicgarden.gg/r/*
 // @match        https://starweaver.org/r/*
