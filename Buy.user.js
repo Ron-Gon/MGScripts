@@ -9,8 +9,8 @@
 // @match        https://starweaver.org/r/*
 // @run-at       document-idle
 // @grant        none
-// @downloadURL    https://raw.githubusercontent.com/Ron-Gon/MGScript/main/Buy.user.js
-// @uploadURL      https://raw.githubusercontent.com/Ron-Gon/MGScript/main/Buy.user.js
+// @downloadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/Buy.user.js
+// @uploadURL      https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/Buy.user.js
 // ==/UserScript==
 
 (function () {
