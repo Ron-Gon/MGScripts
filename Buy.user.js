@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Auto Buyer
 // @namespace    Violentmonkey
-// @version      1.0.0
+// @version      1.1.0
 // @description  Auto Buy Alarmed Items
 // @author       Awon & Gemini
 // @match        https://magiccircle.gg/r/*
@@ -9,14 +9,14 @@
 // @match        https://starweaver.org/r/*
 // @run-at       document-idle
 // @grant        none
-// @downloadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/Buy.user.js
-// @uploadURL      https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/Buy.user.js
+// @downloadURL  https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/Buy.user.js
+// @uploadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/Buy.user.js
 // ==/UserScript==
 
 (function () {
   'use strict';
 
-  const WAIT_AFTER_CLICKING_ALL_MS = 900; // Delay in ms after pressing all buttons
+  const CLICK_INTERVAL_MS = 900; // Delay in ms between each individual click
   let isProcessing = false;
 
   // Helper to fetch all currently visible "Buy all" buttons
@@ -28,44 +28,41 @@
       });
   }
 
-  async function clickAllBuyAllButtons() {
+  async function processBuyAllButtons() {
     if (isProcessing) return;
     isProcessing = true;
 
-    let availableButtons = getBuyAllButtons();
+    while (true) {
+      const availableButtons = getBuyAllButtons();
 
-    while (availableButtons.length > 0) {
-      console.log(`[Script] Pressing all ${availableButtons.length} "Buy all" buttons...`);
+      // If no "Buy all" buttons are visible, stop the loop
+      if (availableButtons.length === 0) break;
 
-      // Press every single "Buy all" button immediately
-      availableButtons.forEach((btn, index) => {
-        console.log(`[Script] Pressing button #${index + 1}`);
-        btn.click();
-      });
+      // Select and click the first available button
+      const btn = availableButtons[0];
+      console.log(`[Script] Clicking a "Buy all" button (${availableButtons.length} remaining)...`);
+      btn.click();
 
-      // Wait 900ms after pressing all of them
-      console.log(`[Script] Waiting ${WAIT_AFTER_CLICKING_ALL_MS}ms...`);
-      await new Promise(resolve => setTimeout(resolve, WAIT_AFTER_CLICKING_ALL_MS));
-
-      // Re-scan to see if any new/remaining "Buy all" buttons are still on screen
-      availableButtons = getBuyAllButtons();
+      // Wait 900ms before checking for the next button
+      console.log(`[Script] Waiting ${CLICK_INTERVAL_MS}ms...`);
+      await new Promise(resolve => setTimeout(resolve, CLICK_INTERVAL_MS));
     }
 
-    console.log('[Script] All "Buy all" buttons pressed.');
+    console.log('[Script] All "Buy all" buttons have been processed.');
     isProcessing = false;
   }
 
-  // Watch DOM for when the popup appears
+  // Watch DOM for when the popup or new buttons appear
   const observer = new MutationObserver(() => {
     const buttons = getBuyAllButtons();
 
     if (buttons.length > 0 && !isProcessing) {
-      clickAllBuyAllButtons();
+      processBuyAllButtons();
     }
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
 
   // Expose function globally for manual testing in Eruda Console via `window.buyAll()`
-  window.buyAll = clickAllBuyAllButtons;
+  window.buyAll = processBuyAllButtons;
 })();
