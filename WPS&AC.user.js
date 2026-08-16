@@ -19,7 +19,7 @@
   // CONFIGURATION & CONSTANTS
   // ==========================================
   const SSE_STREAM_URL = 'https://mg-api.ariedam.fr/live/weather/stream';
-  const CLICK_INTERVAL = 600000; // 10 minutes (in ms)
+  const CLICK_INTERVAL = 10000; // 10 minutes (in ms)
 
   const KEY_MAPPING = {
     'AmberMoon': '1',
