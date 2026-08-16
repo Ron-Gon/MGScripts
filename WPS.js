@@ -17,7 +17,6 @@
 
   const SSE_STREAM_URL = 'https://mg-api.ariedam.fr/live/weather/stream';
 
-  // Hotkey mappings
   const KEY_MAPPING = {
     'AmberMoon': '1',
     'Snow': '2',
@@ -26,27 +25,9 @@
     'Dawn': '5'
   };
 
-  // Weather emoji mappings
-  const EMOJI_MAPPING = {
-    'Rain': '🌧️',
-    'Clear Skies': '☀️',
-    'Snow': '❄️',
-    'Frozen': '❄️',
-    'Thunderstorm': '🌩️',
-    'AmberMoon': '🌅',
-    'Dawn': '🌌'
-  };
-
   let isEnabled = false;
   let isMinimized = false;
-  let lastTriggeredWeather = null;
-
-  /**
-   * Helper to get emoji for a weather condition (fallback to 🌦️)
-   */
-  function getWeatherEmoji(weatherType) {
-    return EMOJI_MAPPING[weatherType] || '🌦️';
-  }
+  let lastTriggeredWeather = null; // Track previous state to prevent duplicates
 
   /**
    * Inject floating overlay container, CSS, and UI components.
@@ -177,7 +158,7 @@
     toggleBtn.addEventListener('click', () => {
       isEnabled = !isEnabled;
       if (isEnabled) {
-        lastTriggeredWeather = null;
+        lastTriggeredWeather = null; // Reset state memory on resume
         toggleBtn.textContent = 'AUTOMATOR: ACTIVE';
         toggleBtn.className = 'btn-active';
         updateLog('▶️ Resumed (Ready)');
@@ -275,25 +256,24 @@
         const payload = JSON.parse(event.data);
         const weatherType = payload.weather;
         const keyDigit = KEY_MAPPING[weatherType];
-        const emoji = getWeatherEmoji(weatherType);
 
         if (!isEnabled) {
-          updateLog(`[Ignored] ${emoji} ${weatherType}`);
+          updateLog(`[Ignored] ${weatherType}`);
           return;
         }
 
         // Deduplication check: skip if weather hasn't changed
         if (weatherType === lastTriggeredWeather) {
-          updateLog(`🔄 Unchanged: ${emoji} ${weatherType}`);
+          updateLog(`🔄 Unchanged: ${weatherType}`);
           return;
         }
 
         if (keyDigit) {
           lastTriggeredWeather = weatherType;
-          updateLog(`${emoji} ${weatherType} (Ctrl+${keyDigit})`);
+          updateLog(`⚡ ${weatherType} (Ctrl+${keyDigit})`);
           triggerCtrlKeypress(keyDigit);
         } else {
-          updateLog(`${emoji} ${weatherType} (No Key)`);
+          updateLog(`❓ ${weatherType} (No Key)`);
         }
       } catch (err) {
         console.error('[Weather Stream] Failed to parse payload:', err);
