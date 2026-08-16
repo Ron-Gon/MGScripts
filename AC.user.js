@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Autoclicker
 // @namespace    violentmonkey
+// @version      1.2.0
+// @description  Floating Auto clicker
+// @author       Awon Gemini
 // @match        https://magiccircle.gg/r/*
 // @match        https://magicgarden.gg/r/*
 // @match        https://starweaver.org/r/*
-// @version      1.2.0
 // @grant        none
-// @author       Awon Gemini
-// @description  Floating Auto clicker
 // @downloadURL  https://raw.githubusercontent.com/Ron-Gon/MGScript/main/AC.user.js
 // @uploadURL    https://raw.githubusercontent.com/Ron-Gon/MGScript/main/AC.user.js
 // ==/UserScript==
