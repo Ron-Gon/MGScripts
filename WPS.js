@@ -1,15 +1,16 @@
 // ==UserScript==
 // @name         Weather Pet Swap
 // @namespace    violentmonkey
-// @version      1.7
+// @version      1.8
 // @description  Autopet swap per weather
 // @author       AWON Gemini
 // @match        https://www.magicgarden.gg/r/*
 // @match        https://www.magiccircle.gg/r/*
 // @match        https://www.starweaver.gg/r/*
-// @grant        none
+// @grant        GM_xmlhttpRequest
+// @connect      mg-api.ariedam.fr
 // @updateURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS.js
-// @downloadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS.js
+// @downloadURL  https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS.js
 // ==/UserScript==
 
 (function () {
@@ -25,9 +26,23 @@
     'Dawn': '5'
   };
 
+  const EMOJI_MAPPING = {
+    'Rain': '🌧️',
+    'Clear Skies': '☀️',
+    'Snow': '❄️',
+    'Frozen': '❄️',
+    'Thunderstorm': '🌩️',
+    'AmberMoon': '🌅',
+    'Dawn': '🌌'
+  };
+
   let isEnabled = false;
   let isMinimized = false;
-  let lastTriggeredWeather = null; // Track previous state to prevent duplicates
+  let lastTriggeredWeather = null;
+
+  function getWeatherEmoji(weatherType) {
+    return EMOJI_MAPPING[weatherType] || '🌦️';
+  }
 
   /**
    * Inject floating overlay container, CSS, and UI components.
@@ -158,7 +173,7 @@
     toggleBtn.addEventListener('click', () => {
       isEnabled = !isEnabled;
       if (isEnabled) {
-        lastTriggeredWeather = null; // Reset state memory on resume
+        lastTriggeredWeather = null;
         toggleBtn.textContent = 'AUTOMATOR: ACTIVE';
         toggleBtn.className = 'btn-active';
         updateLog('▶️ Resumed (Ready)');
@@ -238,7 +253,7 @@
       view: window
     };
 
-    const target = document.activeElement || document;
+    const target = document.activeElement || document.body || document;
 
     target.dispatchEvent(new KeyboardEvent('keydown', keyData));
     target.dispatchEvent(new KeyboardEvent('keypress', keyData));
@@ -246,43 +261,76 @@
   }
 
   /**
-   * Connect to the SSE endpoint and listen for weather events.
+   * Process a single JSON weather payload string.
+   */
+  function handleWeatherPayload(rawJson) {
+    try {
+      const payload = JSON.parse(rawJson);
+      const weatherType = payload.weather;
+      const keyDigit = KEY_MAPPING[weatherType];
+      const emoji = getWeatherEmoji(weatherType);
+
+      if (!isEnabled) {
+        updateLog(`[Ignored] ${emoji} ${weatherType}`);
+        return;
+      }
+
+      if (weatherType === lastTriggeredWeather) {
+        updateLog(`🔄 Unchanged: ${emoji} ${weatherType}`);
+        return;
+      }
+
+      if (keyDigit) {
+        lastTriggeredWeather = weatherType;
+        updateLog(`${emoji} ${weatherType} (Ctrl+${keyDigit})`);
+        triggerCtrlKeypress(keyDigit);
+      } else {
+        updateLog(`${emoji} ${weatherType} (No Key)`);
+      }
+    } catch (err) {
+      console.error('[Weather Stream] JSON parse error:', err);
+    }
+  }
+
+  /**
+   * Connect to SSE using GM_xmlhttpRequest to bypass CORS restrictions.
    */
   function connectStream() {
-    const eventSource = new EventSource(SSE_STREAM_URL);
+    let processedLength = 0;
 
-    eventSource.addEventListener('weather', (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        const weatherType = payload.weather;
-        const keyDigit = KEY_MAPPING[weatherType];
+    GM_xmlhttpRequest({
+      method: 'GET',
+      url: SSE_STREAM_URL,
+      headers: {
+        'Accept': 'text/event-stream',
+        'Cache-Control': 'no-cache'
+      },
+      onreadystatechange: function (response) {
+        if (response.readyState === 3 || response.readyState === 4) {
+          const newData = response.responseText.substring(processedLength);
+          processedLength = response.responseText.length;
 
-        if (!isEnabled) {
-          updateLog(`[Ignored] ${weatherType}`);
-          return;
+          const lines = newData.split('\n');
+          for (let line of lines) {
+            line = line.trim();
+            if (line.startsWith('data:')) {
+              const jsonString = line.replace(/^data:\s*/, '');
+              if (jsonString) {
+                handleWeatherPayload(jsonString);
+              }
+            }
+          }
         }
-
-        // Deduplication check: skip if weather hasn't changed
-        if (weatherType === lastTriggeredWeather) {
-          updateLog(`🔄 Unchanged: ${weatherType}`);
-          return;
-        }
-
-        if (keyDigit) {
-          lastTriggeredWeather = weatherType;
-          updateLog(`⚡ ${weatherType} (Ctrl+${keyDigit})`);
-          triggerCtrlKeypress(keyDigit);
-        } else {
-          updateLog(`❓ ${weatherType} (No Key)`);
-        }
-      } catch (err) {
-        console.error('[Weather Stream] Failed to parse payload:', err);
+      },
+      onerror: function () {
+        updateLog('⚠️ Stream Error. Retrying...');
+        setTimeout(connectStream, 3000);
+      },
+      onload: function () {
+        // Reconnect if stream ends normally
+        setTimeout(connectStream, 1000);
       }
     });
-
-    eventSource.onerror = () => {
-      updateLog('⚠️ Reconnecting...');
-    };
   }
 
   // Initialize
