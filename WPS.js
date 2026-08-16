@@ -1,16 +1,15 @@
 // ==UserScript==
-// @name         Weather Pet Swap
+// @name         Auto Switch Pets
 // @namespace    violentmonkey
-// @version      1.8
-// @description  Autopet swap per weather
+// @version      1.5
+// @description  Floating draggable overlay for live weather event hotkey automation (Touch + Mouse Support)
 // @author       AWON Gemini
-// @match        https://www.magicgarden.gg/r/*
-// @match        https://www.magiccircle.gg/r/*
-// @match        https://www.starweaver.gg/r/*
-// @grant        GM_xmlhttpRequest
-// @connect      mg-api.ariedam.fr
-// @updateURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS.js
-// @downloadURL  https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS.js
+// @match        https://magiccircle.gg/r/*
+// @match        https://magicgarden.gg/r/*
+// @match        https://starweaver.org/r/*
+// @grant        none
+// @uploadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS01.js
+// @downloadURL  https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS01.js
 // ==/UserScript==
 
 (function () {
@@ -23,31 +22,18 @@
     'Snow': '2',
     'Thunderstorm': '3',
     'Clear Skies': '4',
-    'Dawn': '5'
+    'Dawn': '5',
+    'Rain': '4'
   };
 
-  const EMOJI_MAPPING = {
-    'Rain': '🌧️',
-    'Clear Skies': '☀️',
-    'Snow': '❄️',
-    'Frozen': '❄️',
-    'Thunderstorm': '🌩️',
-    'AmberMoon': '🌅',
-    'Dawn': '🌌'
-  };
-
-  let isEnabled = false;
+  let isEnabled = true;
   let isMinimized = false;
-  let lastTriggeredWeather = null;
-
-  function getWeatherEmoji(weatherType) {
-    return EMOJI_MAPPING[weatherType] || '🌦️';
-  }
 
   /**
    * Inject floating overlay container, CSS, and UI components.
    */
   function createOverlayUI() {
+    // Inject custom stylesheet for the overlay
     const style = document.createElement('style');
     style.textContent = `
       #mg-weather-overlay {
@@ -68,6 +54,7 @@
         user-select: none;
         overflow: hidden;
         transition: height 0.2s ease, width 0.2s ease;
+        touch-action: none; /* Prevents touch scrolling while dragging */
       }
       #mg-weather-header {
         display: flex;
@@ -79,6 +66,7 @@
         cursor: move;
         font-weight: 600;
         letter-spacing: 0.5px;
+        touch-action: none;
       }
       #mg-weather-header-title {
         display: flex;
@@ -146,6 +134,7 @@
     `;
     document.head.appendChild(style);
 
+    // Build DOM structure
     const overlay = document.createElement('div');
     overlay.id = 'mg-weather-overlay';
     overlay.innerHTML = `
@@ -158,7 +147,7 @@
         </div>
       </div>
       <div id="mg-weather-body">
-        <button id="mg-weather-toggle-btn" class="btn-paused">AUTOMATOR: PAUSED</button>
+        <button id="mg-weather-toggle-btn" class="btn-active">SWITCH: ACTIVE</button>
         <div id="mg-weather-log">Waiting for stream...</div>
       </div>
     `;
@@ -167,23 +156,23 @@
     if (document.body) mount();
     else window.addEventListener('DOMContentLoaded', mount);
 
+    // Make window draggable via Mouse and Touch
     makeDraggable(overlay, overlay.querySelector('#mg-weather-header'));
 
+    // Toggle button handler
     const toggleBtn = overlay.querySelector('#mg-weather-toggle-btn');
     toggleBtn.addEventListener('click', () => {
       isEnabled = !isEnabled;
       if (isEnabled) {
-        lastTriggeredWeather = null;
-        toggleBtn.textContent = 'AUTOMATOR: ACTIVE';
+        toggleBtn.textContent = 'SWITCH: ACTIVE';
         toggleBtn.className = 'btn-active';
-        updateLog('▶️ Resumed (Ready)');
       } else {
-        toggleBtn.textContent = 'AUTOMATOR: PAUSED';
+        toggleBtn.textContent = 'SWITCH: PAUSED';
         toggleBtn.className = 'btn-paused';
-        updateLog('⏸️ Paused');
       }
     });
 
+    // Minimize button handler
     const minBtn = overlay.querySelector('#mg-weather-min-btn');
     minBtn.addEventListener('click', () => {
       isMinimized = !isMinimized;
@@ -193,36 +182,62 @@
   }
 
   /**
-   * Draggable utility logic.
+   * Universal Draggable utility supporting both Mouse and Touch events.
    */
   function makeDraggable(element, handle) {
     let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
 
-    handle.onmousedown = dragMouseDown;
+    // Mouse Listeners
+    handle.addEventListener('mousedown', dragStart);
+    // Touch Listeners
+    handle.addEventListener('touchstart', dragStart, { passive: false });
 
-    function dragMouseDown(e) {
+    function getCoordinates(e) {
+      if (e.touches && e.touches.length > 0) {
+        return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
+      }
+      return { clientX: e.clientX, clientY: e.clientY };
+    }
+
+    function dragStart(e) {
       if (e.target.tagName === 'BUTTON') return;
-      e.preventDefault();
-      pos3 = e.clientX;
-      pos4 = e.clientY;
-      document.onmouseup = closeDragElement;
-      document.onmousemove = elementDrag;
+
+      // Prevent page scrolling while dragging on touch devices
+      if (e.type === 'touchstart') {
+        e.preventDefault();
+      }
+
+      const coords = getCoordinates(e);
+      pos3 = coords.clientX;
+      pos4 = coords.clientY;
+
+      document.addEventListener('mouseup', closeDragElement);
+      document.addEventListener('mousemove', elementDrag);
+      document.addEventListener('touchend', closeDragElement);
+      document.addEventListener('touchmove', elementDrag, { passive: false });
     }
 
     function elementDrag(e) {
-      e.preventDefault();
-      pos1 = pos3 - e.clientX;
-      pos2 = pos4 - e.clientY;
-      pos3 = e.clientX;
-      pos4 = e.clientY;
+      if (e.type === 'touchmove') {
+        e.preventDefault(); // Stop default browser gestures/scrolling
+      }
+
+      const coords = getCoordinates(e);
+      pos1 = pos3 - coords.clientX;
+      pos2 = pos4 - coords.clientY;
+      pos3 = coords.clientX;
+      pos4 = coords.clientY;
+
       element.style.top = (element.offsetTop - pos2) + "px";
       element.style.left = (element.offsetLeft - pos1) + "px";
-      element.style.right = 'auto';
+      element.style.right = 'auto'; // Break initial CSS right binding
     }
 
     function closeDragElement() {
-      document.onmouseup = null;
-      document.onmousemove = null;
+      document.removeEventListener('mouseup', closeDragElement);
+      document.removeEventListener('mousemove', elementDrag);
+      document.removeEventListener('touchend', closeDragElement);
+      document.removeEventListener('touchmove', elementDrag);
     }
   }
 
@@ -253,7 +268,7 @@
       view: window
     };
 
-    const target = document.activeElement || document.body || document;
+    const target = document.activeElement || document;
 
     target.dispatchEvent(new KeyboardEvent('keydown', keyData));
     target.dispatchEvent(new KeyboardEvent('keypress', keyData));
@@ -261,76 +276,36 @@
   }
 
   /**
-   * Process a single JSON weather payload string.
-   */
-  function handleWeatherPayload(rawJson) {
-    try {
-      const payload = JSON.parse(rawJson);
-      const weatherType = payload.weather;
-      const keyDigit = KEY_MAPPING[weatherType];
-      const emoji = getWeatherEmoji(weatherType);
-
-      if (!isEnabled) {
-        updateLog(`[Ignored] ${emoji} ${weatherType}`);
-        return;
-      }
-
-      if (weatherType === lastTriggeredWeather) {
-        updateLog(`🔄 Unchanged: ${emoji} ${weatherType}`);
-        return;
-      }
-
-      if (keyDigit) {
-        lastTriggeredWeather = weatherType;
-        updateLog(`${emoji} ${weatherType} (Ctrl+${keyDigit})`);
-        triggerCtrlKeypress(keyDigit);
-      } else {
-        updateLog(`${emoji} ${weatherType} (No Key)`);
-      }
-    } catch (err) {
-      console.error('[Weather Stream] JSON parse error:', err);
-    }
-  }
-
-  /**
-   * Connect to SSE using GM_xmlhttpRequest to bypass CORS restrictions.
+   * Connect to the SSE endpoint and listen for weather events.
    */
   function connectStream() {
-    let processedLength = 0;
+    const eventSource = new EventSource(SSE_STREAM_URL);
 
-    GM_xmlhttpRequest({
-      method: 'GET',
-      url: SSE_STREAM_URL,
-      headers: {
-        'Accept': 'text/event-stream',
-        'Cache-Control': 'no-cache'
-      },
-      onreadystatechange: function (response) {
-        if (response.readyState === 3 || response.readyState === 4) {
-          const newData = response.responseText.substring(processedLength);
-          processedLength = response.responseText.length;
+    eventSource.addEventListener('weather', (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        const weatherType = payload.weather;
+        const keyDigit = KEY_MAPPING[weatherType];
 
-          const lines = newData.split('\n');
-          for (let line of lines) {
-            line = line.trim();
-            if (line.startsWith('data:')) {
-              const jsonString = line.replace(/^data:\s*/, '');
-              if (jsonString) {
-                handleWeatherPayload(jsonString);
-              }
-            }
-          }
+        if (!isEnabled) {
+          updateLog(`[Activate] ${weatherType}`);
+          return;
         }
-      },
-      onerror: function () {
-        updateLog('⚠️ Stream Error. Retrying...');
-        setTimeout(connectStream, 3000);
-      },
-      onload: function () {
-        // Reconnect if stream ends normally
-        setTimeout(connectStream, 1000);
+
+        if (keyDigit) {
+          updateLog(`🌦️ ${weatherType} (Ctrl+${keyDigit})`);
+          triggerCtrlKeypress(keyDigit);
+        } else {
+          updateLog(`❓ ${weatherType} (No Key)`);
+        }
+      } catch (err) {
+        console.error('[Weather Stream] Failed to parse payload:', err);
       }
     });
+
+    eventSource.onerror = () => {
+      updateLog('⚠️ Reconnecting...');
+    };
   }
 
   // Initialize
