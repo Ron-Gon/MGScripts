@@ -10,7 +10,7 @@
 // @grant        none
 // @updateURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS.js
 // @downloadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS.js
-// ==UserScript==
+// ==/UserScript==
 
 (function () {
   'use strict';
