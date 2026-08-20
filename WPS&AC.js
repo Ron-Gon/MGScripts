@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WPS&AC unified overlay
 // @namespace    violentmonkey
-// @version      1.0.3
+// @version      1.0.4
 // @description  Unified floating overlay for Canvas Autoclicker and Weather Pet Team Swapper
 // @author       Awon Gemini
 // @match        https://magiccircle.gg/r/*
