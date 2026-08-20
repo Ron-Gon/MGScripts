@@ -7,8 +7,8 @@
 // @match        https://magiccircle.gg/r/*
 // @match        https://magicgarden.gg/r/*
 // @match        https://starweaver.org/r/*
-// @uploadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS&AC.user.js
-// @downloadURL  https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS&AC.user.js
+// @uploadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS&AC.js
+// @downloadURL  https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS&AC.js
 // @grant        GM_xmlhttpRequest
 // ==/UserScript==
 
