@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WPS&AC unified overlay
 // @namespace    violentmonkey
-// @version      1.0.0
+// @version      1.0.3
 // @description  Unified floating overlay for Canvas Autoclicker and Weather Pet Team Swapper
 // @author       Awon Gemini
 // @match        https://magiccircle.gg/r/*
@@ -9,385 +9,264 @@
 // @match        https://starweaver.org/r/*
 // @uploadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS&AC.js
 // @downloadURL  https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS&AC.js
-// @grant        GM_xmlhttpRequest
+// @grant        none
 // ==/UserScript==
 
+
 (function () {
-  'use strict';
+    'use strict';
 
-  // ==========================================
-  // CONFIGURATION & CONSTANTS
-  // ==========================================
-  const SSE_STREAM_URL = 'https://mg-api.ariedam.fr/live/weather/stream';
-  const CLICK_INTERVAL = 600000; // 10 minutes (in ms)
+    // --- CONFIGURATION ---
+    const SSE_STREAM_URL = 'https://mg-api.ariedam.fr/live/weather/stream';
+    const CLICK_INTERVAL_MS = 600000; // 10 minutes
 
-  const KEY_MAPPING = {
-    'AmberMoon': '1',
-    'Snow': '2',
-    'Thunderstorm': '3',
-    'Clear Skies': '4',
-    'Dawn': '5',
-    'Rain': '4'
-  };
+    // Weather to keypress mapping
+    const WEATHER_KEYMAP = {
+        'AmberMoon': { key: '1', ctrlKey: true },
+        'Frost': { key: '2', ctrlKey: true },       // Frost = Snow
+        'Snow': { key: '2', ctrlKey: true },
+        'Thunderstorm': { key: '3', ctrlKey: true },
+        'Clear Skies': { key: '4', ctrlKey: true },
+        'Rain': { key: '4', ctrlKey: true },
+        'Dawn': { key: '5', ctrlKey: true }
+    };
 
-  // State Variables
-  let isClickerActive = false;
-  let clickTimer = null;
-  let isPetSwapEnabled = true;
-  let isMinimized = false;
+    let autoClickerTimer = null;
+    let isActive = false;
+    let pointerX = window.innerWidth / 2;
+    let pointerY = window.innerHeight / 2;
 
-  // Cleanup old overlays if re-running
-  ['mg-unified-overlay', 'canvas-clicker-target'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.remove();
-  });
+    // --- STYLES ---
+    const style = document.createElement('style');
+    style.textContent = `
+        #unified-overlay {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 999999;
+            background: rgba(20, 20, 20, 0.85);
+            backdrop-filter: blur(8px);
+            color: #fff;
+            padding: 12px;
+            border-radius: 10px;
+            font-family: sans-serif;
+            font-size: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            user-select: none;
+            width: 180px;
+        }
+        #unified-overlay-header {
+            font-weight: bold;
+            margin-bottom: 8px;
+            cursor: move;
+            text-align: center;
+            border-bottom: 1px solid #444;
+            padding-bottom: 4px;
+        }
+        .overlay-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .toggle-btn {
+            width: 100%;
+            padding: 6px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #ff4d4d;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .toggle-btn.active {
+            background-color: #2ecc71;
+        }
+        #click-pointer {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ff4d4d;
+            border-radius: 50%;
+            pointer-events: auto;
+            z-index: 999998;
+            transform: translate(-50%, -50%);
+            cursor: grab;
+            box-shadow: 0 0 6px rgba(0,0,0,0.5);
+            transition: border-color 0.3s;
+        }
+        #click-pointer::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 4px;
+            background: #ff4d4d;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: background 0.3s;
+        }
+        #click-pointer.active {
+            border-color: #2ecc71;
+        }
+        #click-pointer.active::after {
+            background: #2ecc71;
+        }
+        #sse-status {
+            font-size: 10px;
+            color: #aaa;
+            text-align: center;
+            word-break: break-word;
+        }
+    `;
+    document.head.appendChild(style);
 
-  // ==========================================
-  // UNIVERSAL DRAGGABLE UTILITY
-  // ==========================================
-  function makeDraggable(element, handle = element) {
-    let isDragging = false;
-    let startX = 0, startY = 0;
-    let offsetX = 0, offsetY = 0;
-
-    function onDragStart(e) {
-      if (e.target.tagName === 'BUTTON') return;
-
-      isDragging = true;
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-      startX = clientX;
-      startY = clientY;
-
-      const rect = element.getBoundingClientRect();
-      offsetX = clientX - rect.left;
-      offsetY = clientY - rect.top;
-    }
-
-    function onDragMove(e) {
-      if (!isDragging) return;
-
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-      element.style.left = `${clientX - offsetX}px`;
-      element.style.top = `${clientY - offsetY}px`;
-      element.style.right = 'auto';
-    }
-
-    function onDragEnd() {
-      isDragging = false;
-    }
-
-    handle.addEventListener('mousedown', onDragStart);
-    handle.addEventListener('touchstart', onDragStart, { passive: true });
-    window.addEventListener('mousemove', onDragMove);
-    window.addEventListener('touchmove', onDragMove, { passive: true });
-    window.addEventListener('mouseup', onDragEnd);
-    window.addEventListener('touchend', onDragEnd);
-  }
-
-  // ==========================================
-  // UI CONSTRUCTION
-  // ==========================================
-
-  // 1. Target Marker (Floating Crosshair)
-  const target = document.createElement('div');
-  target.id = 'canvas-clicker-target';
-  target.innerHTML = '+';
-  Object.assign(target.style, {
-    position: 'fixed',
-    top: '50%',
-    left: '50%',
-    width: '36px',
-    height: '36px',
-    marginTop: '-18px',
-    marginLeft: '-18px',
-    zIndex: '999998',
-    backgroundColor: 'rgba(255, 0, 0, 0.4)',
-    border: '2px solid red',
-    borderRadius: '50%',
-    color: 'white',
-    fontSize: '24px',
-    fontWeight: 'bold',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0 0 8px rgba(0,0,0,0.5)',
-    touchAction: 'none',
-    userSelect: 'none',
-    cursor: 'move'
-  });
-  makeDraggable(target);
-
-  // 2. Main Floating Panel & Styles
-  const style = document.createElement('style');
-  style.textContent = `
-    #mg-unified-overlay {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      width: 240px;
-      z-index: 999999;
-      background: rgba(20, 24, 33, 0.90);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-      color: #e2e8f0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      font-size: 12px;
-      user-select: none;
-      overflow: hidden;
-      transition: width 0.2s ease;
-      touch-action: none;
-    }
-    #mg-unified-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 12px;
-      background: rgba(255, 255, 255, 0.06);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      cursor: move;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-    }
-    .mg-btn-icon {
-      background: none;
-      border: none;
-      color: #a0aec0;
-      cursor: pointer;
-      padding: 2px 4px;
-      font-size: 12px;
-      line-height: 1;
-      border-radius: 4px;
-    }
-    .mg-btn-icon:hover {
-      color: #ffffff;
-      background: rgba(255, 255, 255, 0.1);
-    }
-    #mg-unified-body {
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .mg-section-title {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: #94a3b8;
-      font-weight: 700;
-      margin-bottom: -4px;
-    }
-    .mg-toggle-btn {
-      width: 100%;
-      padding: 7px;
-      border-radius: 6px;
-      border: none;
-      font-weight: 700;
-      font-size: 11px;
-      cursor: pointer;
-      transition: background-color 0.2s ease, transform 0.1s ease;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-    }
-    .mg-toggle-btn:active {
-      transform: scale(0.98);
-    }
-    .btn-active {
-      background-color: #10b981 !important;
-      color: #ffffff !important;
-    }
-    .btn-paused {
-      background-color: #ef4444 !important;
-      color: #ffffff !important;
-    }
-    #mg-weather-log {
-      background: rgba(0, 0, 0, 0.35);
-      border-radius: 6px;
-      padding: 6px 8px;
-      font-family: monospace;
-      font-size: 11px;
-      color: #cbd5e1;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-    }
-    #mg-unified-overlay.minimized #mg-unified-body {
-      display: none;
-    }
-    #mg-unified-overlay.minimized {
-      width: 180px;
-    }
-  `;
-  document.head.appendChild(style);
-
-  const overlay = document.createElement('div');
-  overlay.id = 'mg-unified-overlay';
-  overlay.innerHTML = `
-    <div id="mg-unified-header">
-      <span>🛠️ MG Suite</span>
-      <button id="mg-min-btn" class="mg-btn-icon" title="Minimize">—</button>
-    </div>
-    <div id="mg-unified-body">
-      <!-- Autoclicker Module -->
-      <div class="mg-section-title">Autoclicker</div>
-      <button id="mg-clicker-btn" class="mg-toggle-btn btn-paused">Clicker: OFF</button>
-
-      <!-- Weather Pet Swap Module -->
-      <div class="mg-section-title">Pet Swapper</div>
-      <button id="mg-weather-btn" class="mg-toggle-btn btn-active">Pet Swap: ACTIVE</button>
-      <div id="mg-weather-log">Waiting for stream...</div>
-    </div>
-  `;
-
-  const mount = () => {
-    document.body.appendChild(target);
+    // --- DOM ELEMENTS ---
+    const overlay = document.createElement('div');
+    overlay.id = 'unified-overlay';
+    overlay.innerHTML = `
+        <div id="unified-overlay-header">Control Overlay</div>
+        <div class="overlay-row">
+            <button id="toggle-autoclick" class="toggle-btn">AutoClicker: OFF</button>
+        </div>
+        <div id="sse-status">SSE: Connecting...</div>
+    `;
     document.body.appendChild(overlay);
-  };
-  if (document.body) mount();
-  else window.addEventListener('DOMContentLoaded', mount);
 
-  makeDraggable(overlay, overlay.querySelector('#mg-unified-header'));
+    const pointer = document.createElement('div');
+    pointer.id = 'click-pointer';
+    pointer.style.left = `${pointerX}px`;
+    pointer.style.top = `${pointerY}px`;
+    document.body.appendChild(pointer);
 
-  // Minimize Toggle
-  const minBtn = overlay.querySelector('#mg-min-btn');
-  minBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    isMinimized = !isMinimized;
-    overlay.classList.toggle('minimized', isMinimized);
-    minBtn.textContent = isMinimized ? '┼' : '—';
-  });
+    // --- DRAGGABLE OVERLAY & POINTER LOGIC ---
+    function makeDraggable(element, handle, onMove) {
+        let isDragging = false, startX, startY, initialLeft, initialTop;
 
-  // ==========================================
-  // AUTOCLICKER CORE LOGIC
-  // ==========================================
-  function performClickAtTarget() {
-    const targetRect = target.getBoundingClientRect();
-    const centerX = targetRect.left + targetRect.width / 2;
-    const centerY = targetRect.top + targetRect.height / 2;
+        handle.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            const rect = element.getBoundingClientRect();
+            initialLeft = rect.left;
+            initialTop = rect.top;
+            
+            const onMouseMove = (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                const newLeft = initialLeft + dx;
+                const newTop = initialTop + dy;
+                element.style.left = `${newLeft}px`;
+                element.style.top = `${newTop}px`;
+                if (onMove) onMove(newLeft, newTop);
+            };
 
-    // Get all elements under the target position and filter out script UI overlays
-    const elements = document.elementsFromPoint(centerX, centerY);
-    const hitElement = elements.find(el => el !== target && !overlay.contains(el)) || document.querySelector('canvas');
+            const onMouseUp = () => {
+                isDragging = false;
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+            };
 
-    if (!hitElement) return;
-
-    const eventParams = {
-      bubbles: true,
-      cancelable: true,
-      view: window,
-      clientX: centerX,
-      clientY: centerY,
-      pointerId: 1,
-      pointerType: 'touch',
-      isPrimary: true
-    };
-
-    hitElement.dispatchEvent(new PointerEvent('pointerdown', eventParams));
-    hitElement.dispatchEvent(new PointerEvent('pointerup', eventParams));
-    hitElement.dispatchEvent(new MouseEvent('click', eventParams));
-  }
-
-  const clickerBtn = overlay.querySelector('#mg-clicker-btn');
-  clickerBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    isClickerActive = !isClickerActive;
-
-    if (isClickerActive) {
-      clickerBtn.textContent = 'Clicker: ON';
-      clickerBtn.className = 'mg-toggle-btn btn-active';
-      target.style.backgroundColor = 'rgba(0, 255, 0, 0.4)';
-      target.style.borderColor = '#00ff00';
-
-      performClickAtTarget();
-      clickTimer = setInterval(performClickAtTarget, CLICK_INTERVAL);
-    } else {
-      clickerBtn.textContent = 'Clicker: OFF';
-      clickerBtn.className = 'mg-toggle-btn btn-paused';
-      target.style.backgroundColor = 'rgba(255, 0, 0, 0.4)';
-      target.style.borderColor = 'red';
-
-      if (clickTimer) {
-        clearInterval(clickTimer);
-        clickTimer = null;
-      }
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        });
     }
-  });
 
-  // ==========================================
-  // PET SWAPPER CORE LOGIC
-  // ==========================================
-  const petSwapBtn = overlay.querySelector('#mg-weather-btn');
-  petSwapBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    isPetSwapEnabled = !isPetSwapEnabled;
-    if (isPetSwapEnabled) {
-      petSwapBtn.textContent = 'Pet Swap: ACTIVE';
-      petSwapBtn.className = 'mg-toggle-btn btn-active';
-    } else {
-      petSwapBtn.textContent = 'Pet Swap: PAUSED';
-      petSwapBtn.className = 'mg-toggle-btn btn-paused';
-    }
-  });
-
-  function updateLog(text) {
-    const logEl = overlay.querySelector('#mg-weather-log');
-    if (logEl) logEl.textContent = text;
-  }
-
-  function triggerCtrlKeypress(digit) {
-    const charCode = 48 + parseInt(digit, 10);
-    const keyData = {
-      key: digit,
-      code: `Digit${digit}`,
-      keyCode: charCode,
-      which: charCode,
-      ctrlKey: true,
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-      view: window
-    };
-
-    const activeTarget = document.activeElement || document;
-    activeTarget.dispatchEvent(new KeyboardEvent('keydown', keyData));
-    activeTarget.dispatchEvent(new KeyboardEvent('keypress', keyData));
-    activeTarget.dispatchEvent(new KeyboardEvent('keyup', keyData));
-  }
-
-  function connectStream() {
-    const eventSource = new EventSource(SSE_STREAM_URL);
-
-    eventSource.addEventListener('weather', (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        const weatherType = payload.weather;
-        const keyDigit = KEY_MAPPING[weatherType];
-
-        if (!isPetSwapEnabled) {
-          updateLog(`[Paused] ${weatherType}`);
-          return;
-        }
-
-        if (keyDigit) {
-          updateLog(`🌦️ ${weatherType} (Ctrl+${keyDigit})`);
-          triggerCtrlKeypress(keyDigit);
-        } else {
-          updateLog(`❓ ${weatherType} (No Key)`);
-        }
-      } catch (err) {
-        console.error('[Weather Stream] Failed to parse payload:', err);
-      }
+    makeDraggable(overlay, overlay.querySelector('#unified-overlay-header'));
+    makeDraggable(pointer, pointer, (x, y) => {
+        pointerX = x;
+        pointerY = y;
     });
 
-    eventSource.onerror = () => {
-      updateLog('⚠️ Reconnecting...');
-    };
-  }
+    // --- SIMULATION FUNCTIONS ---
+    function simulateClick(x, y) {
+        const target = document.elementFromPoint(x, y) || document.body;
+        
+        ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(eventType => {
+            const event = new MouseEvent(eventType, {
+                view: window,
+                bubbles: true,
+                cancelable: true,
+                clientX: x,
+                clientY: y
+            });
+            target.dispatchEvent(event);
+        });
+    }
 
-  connectStream();
+    function simulateKeyPress(keyConfig) {
+        ['keydown', 'keypress', 'keyup'].forEach(eventType => {
+            const event = new KeyboardEvent(eventType, {
+                key: keyConfig.key,
+                code: `Digit${keyConfig.key}`,
+                keyCode: keyConfig.key.charCodeAt(0),
+                which: keyConfig.key.charCodeAt(0),
+                ctrlKey: keyConfig.ctrlKey || false,
+                bubbles: true,
+                cancelable: true
+            });
+            document.dispatchEvent(event);
+        });
+    }
+
+    // --- AUTOCLICKER CONTROL ---
+    const toggleBtn = overlay.querySelector('#toggle-autoclick');
+
+    function toggleAutoClicker() {
+        isActive = !isActive;
+        if (isActive) {
+            toggleBtn.textContent = 'AutoClicker: ON';
+            toggleBtn.classList.add('active');
+            pointer.classList.add('active');
+            
+            // Execute initial click and start interval
+            simulateClick(pointerX, pointerY);
+            autoClickerTimer = setInterval(() => {
+                simulateClick(pointerX, pointerY);
+            }, CLICK_INTERVAL_MS);
+        } else {
+            toggleBtn.textContent = 'AutoClicker: OFF';
+            toggleBtn.classList.remove('active');
+            pointer.classList.remove('active');
+            clearInterval(autoClickerTimer);
+            autoClickerTimer = null;
+        }
+    }
+
+    toggleBtn.addEventListener('click', toggleAutoClicker);
+
+    // --- SSE STREAM WATCHER ---
+    const sseStatus = overlay.querySelector('#sse-status');
+
+    function initSSE() {
+        const evtSource = new EventSource(SSE_STREAM_URL);
+
+        evtSource.onmessage = function (event) {
+            try {
+                const data = JSON.parse(event.data);
+                const weather = data.weather || data.state || event.data;
+                sseStatus.textContent = `Weather: ${weather}`;
+
+                if (WEATHER_KEYMAP[weather]) {
+                    simulateKeyPress(WEATHER_KEYMAP[weather]);
+                }
+            } catch (e) {
+                // Fallback for raw text payload
+                const weather = event.data.trim();
+                sseStatus.textContent = `Weather: ${weather}`;
+                if (WEATHER_KEYMAP[weather]) {
+                    simulateKeyPress(WEATHER_KEYMAP[weather]);
+                }
+            }
+        };
+
+        evtSource.onerror = function () {
+            sseStatus.textContent = 'SSE: Reconnecting...';
+        };
+    }
+
+    initSSE();
 })();
-
