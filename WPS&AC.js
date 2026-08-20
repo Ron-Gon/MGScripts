@@ -19,7 +19,7 @@
   // CONFIGURATION & CONSTANTS
   // ==========================================
   const SSE_STREAM_URL = 'https://mg-api.ariedam.fr/live/weather/stream';
-  const CLICK_INTERVAL = 10000; // 10 minutes (in ms)
+  const CLICK_INTERVAL = 600000; // 10 minutes (in ms)
 
   const KEY_MAPPING = {
     'AmberMoon': '1',
@@ -45,18 +45,15 @@
   // ==========================================
   // UNIVERSAL DRAGGABLE UTILITY
   // ==========================================
-  function makeDraggable(element, handle = element, onSingleTap = null) {
+  function makeDraggable(element, handle = element) {
     let isDragging = false;
-    let hasMoved = false;
     let startX = 0, startY = 0;
     let offsetX = 0, offsetY = 0;
 
     function onDragStart(e) {
-      if (e.target.tagName === 'BUTTON' && e.target !== handle) return;
+      if (e.target.tagName === 'BUTTON') return;
 
       isDragging = true;
-      hasMoved = false;
-
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
@@ -74,19 +71,12 @@
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-      if (Math.hypot(clientX - startX, clientY - startY) > 5) {
-        hasMoved = true;
-      }
-
       element.style.left = `${clientX - offsetX}px`;
       element.style.top = `${clientY - offsetY}px`;
       element.style.right = 'auto';
     }
 
-    function onDragEnd(e) {
-      if (isDragging && !hasMoved && onSingleTap) {
-        onSingleTap(e);
-      }
+    function onDragEnd() {
       isDragging = false;
     }
 
@@ -102,7 +92,7 @@
   // UI CONSTRUCTION
   // ==========================================
 
-  // 1. Target Marker (Floating Crosshair for Autoclicker)
+  // 1. Target Marker (Floating Crosshair)
   const target = document.createElement('div');
   target.id = 'canvas-clicker-target';
   target.innerHTML = '+';
@@ -131,7 +121,7 @@
   });
   makeDraggable(target);
 
-  // 2. Main Floating Panel & CSS
+  // 2. Main Floating Panel & Styles
   const style = document.createElement('style');
   style.textContent = `
     #mg-unified-overlay {
@@ -209,12 +199,12 @@
       transform: scale(0.98);
     }
     .btn-active {
-      background-color: #10b981;
-      color: #ffffff;
+      background-color: #10b981 !important;
+      color: #ffffff !important;
     }
     .btn-paused {
-      background-color: #ef4444;
-      color: #ffffff;
+      background-color: #ef4444 !important;
+      color: #ffffff !important;
     }
     #mg-weather-log {
       background: rgba(0, 0, 0, 0.35);
@@ -264,7 +254,8 @@
 
   // Minimize Toggle
   const minBtn = overlay.querySelector('#mg-min-btn');
-  minBtn.addEventListener('click', () => {
+  minBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
     isMinimized = !isMinimized;
     overlay.classList.toggle('minimized', isMinimized);
     minBtn.textContent = isMinimized ? '┼' : '—';
@@ -274,12 +265,15 @@
   // AUTOCLICKER CORE LOGIC
   // ==========================================
   function performClickAtTarget() {
-    const canvas = document.querySelector('canvas');
-    if (!canvas) return;
-
     const targetRect = target.getBoundingClientRect();
     const centerX = targetRect.left + targetRect.width / 2;
     const centerY = targetRect.top + targetRect.height / 2;
+
+    // Get all elements under the target position and filter out script UI overlays
+    const elements = document.elementsFromPoint(centerX, centerY);
+    const hitElement = elements.find(el => el !== target && !overlay.contains(el)) || document.querySelector('canvas');
+
+    if (!hitElement) return;
 
     const eventParams = {
       bubbles: true,
@@ -292,21 +286,14 @@
       isPrimary: true
     };
 
-    target.style.pointerEvents = 'none';
-    overlay.style.pointerEvents = 'none';
-
-    const hitElement = document.elementFromPoint(centerX, centerY) || canvas;
-
     hitElement.dispatchEvent(new PointerEvent('pointerdown', eventParams));
     hitElement.dispatchEvent(new PointerEvent('pointerup', eventParams));
     hitElement.dispatchEvent(new MouseEvent('click', eventParams));
-
-    target.style.pointerEvents = 'auto';
-    overlay.style.pointerEvents = 'auto';
   }
 
   const clickerBtn = overlay.querySelector('#mg-clicker-btn');
-  clickerBtn.addEventListener('click', () => {
+  clickerBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
     isClickerActive = !isClickerActive;
 
     if (isClickerActive) {
@@ -323,8 +310,10 @@
       target.style.backgroundColor = 'rgba(255, 0, 0, 0.4)';
       target.style.borderColor = 'red';
 
-      clearInterval(clickTimer);
-      clickTimer = null;
+      if (clickTimer) {
+        clearInterval(clickTimer);
+        clickTimer = null;
+      }
     }
   });
 
@@ -332,7 +321,8 @@
   // PET SWAPPER CORE LOGIC
   // ==========================================
   const petSwapBtn = overlay.querySelector('#mg-weather-btn');
-  petSwapBtn.addEventListener('click', () => {
+  petSwapBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
     isPetSwapEnabled = !isPetSwapEnabled;
     if (isPetSwapEnabled) {
       petSwapBtn.textContent = 'Pet Swap: ACTIVE';
@@ -400,3 +390,4 @@
 
   connectStream();
 })();
+
