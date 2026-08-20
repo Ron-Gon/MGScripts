@@ -12,13 +12,12 @@
 // @grant        none
 // ==/UserScript==
 
-
 (function () {
     'use strict';
 
     // --- CONFIGURATION ---
     const SSE_STREAM_URL = 'https://mg-api.ariedam.fr/live/weather/stream';
-    const CLICK_INTERVAL_MS = 600000; // 10 minutes
+    const CLICK_INTERVAL_MS = 1000; // 10 minutes
 
     // Weather to keypress mapping
     const WEATHER_KEYMAP = {
@@ -31,8 +30,12 @@
         'Dawn': { key: '5', ctrlKey: true }
     };
 
+    // State Variables
     let autoClickerTimer = null;
-    let isActive = false;
+    let isAutoClickerActive = false;
+    let isSSEActive = false;
+    let evtSource = null;
+
     let pointerX = window.innerWidth / 2;
     let pointerY = window.innerHeight / 2;
 
@@ -65,8 +68,8 @@
         }
         .overlay-row {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
+            gap: 6px;
             margin-bottom: 8px;
         }
         .toggle-btn {
@@ -85,16 +88,17 @@
         }
         #click-pointer {
             position: fixed;
-            width: 20px;
-            height: 20px;
-            border: 2px solid #ff4d4d;
+            width: 24px;
+            height: 24px;
+            border: 2px dashed #ff4d4d;
             border-radius: 50%;
             pointer-events: auto;
             z-index: 999998;
             transform: translate(-50%, -50%);
-            cursor: grab;
+            cursor: move;
             box-shadow: 0 0 6px rgba(0,0,0,0.5);
-            transition: border-color 0.3s;
+            transition: border-color 0.3s, background-color 0.2s;
+            background: rgba(255, 77, 77, 0.1);
         }
         #click-pointer::after {
             content: '';
@@ -110,6 +114,8 @@
         }
         #click-pointer.active {
             border-color: #2ecc71;
+            border-style: solid;
+            background: rgba(46, 204, 113, 0.1);
         }
         #click-pointer.active::after {
             background: #2ecc71;
@@ -119,6 +125,7 @@
             color: #aaa;
             text-align: center;
             word-break: break-word;
+            margin-top: 4px;
         }
     `;
     document.head.appendChild(style);
@@ -130,18 +137,20 @@
         <div id="unified-overlay-header">Control Overlay</div>
         <div class="overlay-row">
             <button id="toggle-autoclick" class="toggle-btn">AutoClicker: OFF</button>
+            <button id="toggle-sse" class="toggle-btn">SSE Watcher: OFF</button>
         </div>
-        <div id="sse-status">SSE: Connecting...</div>
+        <div id="sse-status">SSE: Disabled</div>
     `;
     document.body.appendChild(overlay);
 
     const pointer = document.createElement('div');
     pointer.id = 'click-pointer';
+    pointer.title = 'Drag me to set click location';
     pointer.style.left = `${pointerX}px`;
     pointer.style.top = `${pointerY}px`;
     document.body.appendChild(pointer);
 
-    // --- DRAGGABLE OVERLAY & POINTER LOGIC ---
+    // --- DRAGGABLE HANDLER ---
     function makeDraggable(element, handle, onMove) {
         let isDragging = false, startX, startY, initialLeft, initialTop;
 
@@ -149,9 +158,11 @@
             isDragging = true;
             startX = e.clientX;
             startY = e.clientY;
+            
             const rect = element.getBoundingClientRect();
-            initialLeft = rect.left;
-            initialTop = rect.top;
+            // Calculate center point offset if dragging the pointer
+            initialLeft = rect.left + (element === pointer ? rect.width / 2 : 0);
+            initialTop = rect.top + (element === pointer ? rect.height / 2 : 0);
             
             const onMouseMove = (e) => {
                 if (!isDragging) return;
@@ -159,8 +170,10 @@
                 const dy = e.clientY - startY;
                 const newLeft = initialLeft + dx;
                 const newTop = initialTop + dy;
+                
                 element.style.left = `${newLeft}px`;
                 element.style.top = `${newTop}px`;
+                
                 if (onMove) onMove(newLeft, newTop);
             };
 
@@ -183,8 +196,11 @@
 
     // --- SIMULATION FUNCTIONS ---
     function simulateClick(x, y) {
+        // Temporarily hide pointer so elementFromPoint targets the underlying DOM element
+        pointer.style.display = 'none';
         const target = document.elementFromPoint(x, y) || document.body;
-        
+        pointer.style.display = 'block';
+
         ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(eventType => {
             const event = new MouseEvent(eventType, {
                 view: window,
@@ -212,61 +228,73 @@
         });
     }
 
-    // --- AUTOCLICKER CONTROL ---
-    const toggleBtn = overlay.querySelector('#toggle-autoclick');
+    // --- AUTOCLICKER TOGGLE ---
+    const toggleClickBtn = overlay.querySelector('#toggle-autoclick');
 
-    function toggleAutoClicker() {
-        isActive = !isActive;
-        if (isActive) {
-            toggleBtn.textContent = 'AutoClicker: ON';
-            toggleBtn.classList.add('active');
+    toggleClickBtn.addEventListener('click', () => {
+        isAutoClickerActive = !isAutoClickerActive;
+        if (isAutoClickerActive) {
+            toggleClickBtn.textContent = 'AutoClicker: ON';
+            toggleClickBtn.classList.add('active');
             pointer.classList.add('active');
-            
-            // Execute initial click and start interval
+
             simulateClick(pointerX, pointerY);
             autoClickerTimer = setInterval(() => {
                 simulateClick(pointerX, pointerY);
             }, CLICK_INTERVAL_MS);
         } else {
-            toggleBtn.textContent = 'AutoClicker: OFF';
-            toggleBtn.classList.remove('active');
+            toggleClickBtn.textContent = 'AutoClicker: OFF';
+            toggleClickBtn.classList.remove('active');
             pointer.classList.remove('active');
+            
             clearInterval(autoClickerTimer);
             autoClickerTimer = null;
         }
-    }
+    });
 
-    toggleBtn.addEventListener('click', toggleAutoClicker);
-
-    // --- SSE STREAM WATCHER ---
+    // --- SSE WATCHER TOGGLE ---
+    const toggleSseBtn = overlay.querySelector('#toggle-sse');
     const sseStatus = overlay.querySelector('#sse-status');
 
-    function initSSE() {
-        const evtSource = new EventSource(SSE_STREAM_URL);
+    toggleSseBtn.addEventListener('click', () => {
+        isSSEActive = !isSSEActive;
+        if (isSSEActive) {
+            toggleSseBtn.textContent = 'SSE Watcher: ON';
+            toggleSseBtn.classList.add('active');
+            sseStatus.textContent = 'SSE: Connecting...';
 
-        evtSource.onmessage = function (event) {
-            try {
-                const data = JSON.parse(event.data);
-                const weather = data.weather || data.state || event.data;
+            evtSource = new EventSource(SSE_STREAM_URL);
+
+            evtSource.onmessage = function (event) {
+                let weather = '';
+                try {
+                    const data = JSON.parse(event.data);
+                    weather = data.weather || data.state || event.data;
+                } catch (e) {
+                    weather = event.data.trim();
+                }
+
                 sseStatus.textContent = `Weather: ${weather}`;
 
                 if (WEATHER_KEYMAP[weather]) {
                     simulateKeyPress(WEATHER_KEYMAP[weather]);
                 }
-            } catch (e) {
-                // Fallback for raw text payload
-                const weather = event.data.trim();
-                sseStatus.textContent = `Weather: ${weather}`;
-                if (WEATHER_KEYMAP[weather]) {
-                    simulateKeyPress(WEATHER_KEYMAP[weather]);
+            };
+
+            evtSource.onerror = function () {
+                if (isSSEActive) {
+                    sseStatus.textContent = 'SSE: Reconnecting...';
                 }
+            };
+        } else {
+            toggleSseBtn.textContent = 'SSE Watcher: OFF';
+            toggleSseBtn.classList.remove('active');
+            sseStatus.textContent = 'SSE: Disabled';
+
+            if (evtSource) {
+                evtSource.close();
+                evtSource = null;
             }
-        };
-
-        evtSource.onerror = function () {
-            sseStatus.textContent = 'SSE: Reconnecting...';
-        };
-    }
-
-    initSSE();
+        }
+    });
 })();
