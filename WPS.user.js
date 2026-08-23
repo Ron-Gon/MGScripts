@@ -15,7 +15,7 @@
 (function () {
   'use strict';
 
-  const SSE_STREAM_URL = 'https://mg-api.ariedam.fr/live/weather';
+  const SSE_STREAM_URL = 'https://mg-api.ariedam.fr/live/weather/stream';
 
   const KEY_MAPPING = {
     'Amber Moon': '1',
