@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Weather Pet Swap
 // @namespace    violentmonkey
-// @version      1.0.2
+// @version      1.0.3
 // @description  Auto swap pet teams per weather via keybind with AriesMod
 // @author       AWON Gemini
 // @match        https://magiccircle.gg/r/*
@@ -15,7 +15,7 @@
 (function () {
   'use strict';
 
-  const SSE_STREAM_URL = 'https://magicgarden.gg/platform/v1/weather';
+  const SSE_STREAM_URL = 'https://mg-api.ariedam.fr/live/weather';
 
   const KEY_MAPPING = {
     'Amber Moon': '1',
