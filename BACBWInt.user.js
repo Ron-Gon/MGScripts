@@ -15,7 +15,7 @@
     'use strict';
 
     // Settings
-    const FIVE_MINUTES_MS = 5 * 60 * 1000;  // Bell timer interval (5 minutes)
+    const FIVE_MINUTES_MS = 2000;  // Bell timer interval (5 minutes)
     const ONE_SECOND_MS = 1000;             // Delay between the 2 bell clicks
     const WAIT_AFTER_BUY_ALL_MS = 900;      // Cooldown after clicking "Buy All" buttons
 
