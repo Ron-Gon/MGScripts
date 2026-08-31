@@ -16,7 +16,7 @@
 (function () {
   'use strict';
 
-  const CLICK_INTERVAL_MS = 900; // Delay in ms between each individual click
+  const CLICK_INTERVAL_MS = 8000; // Delay in ms between each individual click
   let isProcessing = false;
 
   // Helper to fetch all currently visible "Buy all" buttons
