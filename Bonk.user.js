@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bonk Bonk
 // @namespace    Violentmonkey
-// @version      1.0.3
+// @version      1.0.4
 // @description  Floating overlay with buttons, buttons simulates key presses
 // @author       AWON
 // @match        https://magicgarden.gg/r/*
@@ -24,7 +24,7 @@
         { label: 'Rain', color: '#104E8B', textColor: '#FFF', key: '6' }
     ];
 
-    // 2. Keyboard event simulator
+    // 2. Keyboard event dispatch function
     function triggerHotKey(keyChar) {
         const eventInit = {
             key: keyChar,
@@ -58,7 +58,7 @@
         gap: '8px',
         fontFamily: 'system-ui, sans-serif',
         userSelect: 'none',
-        touchAction: 'none', // Prevents page scrolling while dragging panel
+        touchAction: 'none', // Prevents screen scrolling while dragging on touch devices
         cursor: 'move'
     });
 
@@ -81,32 +81,22 @@
             touchAction: 'manipulation'
         });
 
-        // Click / Tap Action
-        const handleAction = (e) => {
+        // Mouse click triggers
+        btn.addEventListener('click', (e) => {
             e.stopPropagation();
             triggerHotKey(btnInfo.key);
-        };
+        });
 
-        btn.addEventListener('click', handleAction);
-        
-        // Visual press feedback
+        // Touch triggers for buttons
         btn.addEventListener('touchstart', (e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // Stops drag execution when tapping a button
             btn.style.transform = 'scale(0.95)';
         }, { passive: true });
 
-        btn.addEventListener('touchend', () => {
+        btn.addEventListener('touchend', (e) => {
+            e.stopPropagation();
             btn.style.transform = 'scale(1)';
         }, { passive: true });
-
-        btn.addEventListener('mousedown', (e) => {
-            e.stopPropagation();
-            btn.style.transform = 'scale(0.95)';
-        });
-        
-        btn.addEventListener('mouseup', () => {
-            btn.style.transform = 'scale(1)';
-        });
 
         container.appendChild(btn);
     });
@@ -115,54 +105,42 @@
 
     // 5. Combined Mouse & Touch Drag Logic
     let isDragging = false;
-    let startX = 0, startY = 0;
-    let initialLeft = 0, initialTop = 0;
+    let offsetX = 0, offsetY = 0;
 
-    const getCoords = (e) => e.touches ? e.touches[0] : e;
+    function getPointerPosition(e) {
+        return e.touches ? e.touches[0] : e;
+    }
 
-    const dragStart = (e) => {
+    function startDrag(e) {
         isDragging = true;
-        const coords = getCoords(e);
-        
-        // Cache initial positions
-        const rect = container.getBoundingClientRect();
-        initialLeft = rect.left;
-        initialTop = rect.top;
+        const pointer = getPointerPosition(e);
+        offsetX = pointer.clientX - container.offsetLeft;
+        offsetY = pointer.clientY - container.offsetTop;
+    }
 
-        startX = coords.clientX;
-        startY = coords.clientY;
-
-        // Convert positioning from right-anchored to left-anchored seamlessly
-        container.style.left = `${initialLeft}px`;
-        container.style.top = `${initialTop}px`;
-        container.style.right = 'auto';
-    };
-
-    const dragMove = (e) => {
+    function moveDrag(e) {
         if (!isDragging) return;
         
-        // Prevent default screen scrolling during touch drag
-        if (e.touches) e.preventDefault();
+        // Prevent default screen scrolling on touch drag
+        if (e.type === 'touchmove') e.preventDefault(); 
 
-        const coords = getCoords(e);
-        const deltaX = coords.clientX - startX;
-        const deltaY = coords.clientY - startY;
+        const pointer = getPointerPosition(e);
+        container.style.left = `${pointer.clientX - offsetX}px`;
+        container.style.top = `${pointer.clientY - offsetY}px`;
+        container.style.right = 'auto'; // Disable initial right alignment
+    }
 
-        container.style.left = `${initialLeft + deltaX}px`;
-        container.style.top = `${initialTop + deltaY}px`;
-    };
-
-    const dragEnd = () => {
+    function stopDrag() {
         isDragging = false;
-    };
+    }
 
-    // Mouse Listeners
-    container.addEventListener('mousedown', dragStart);
-    document.addEventListener('mousemove', dragMove);
-    document.addEventListener('mouseup', dragEnd);
+    // Mouse listeners
+    container.addEventListener('mousedown', startDrag);
+    document.addEventListener('mousemove', moveDrag);
+    document.addEventListener('mouseup', stopDrag);
 
-    // Touch Listeners
-    container.addEventListener('touchstart', dragStart, { passive: false });
-    document.addEventListener('touchmove', dragMove, { passive: false });
-    document.addEventListener('touchend', dragEnd);
+    // Touch listeners
+    container.addEventListener('touchstart', startDrag, { passive: false });
+    document.addEventListener('touchmove', moveDrag, { passive: false });
+    document.addEventListener('touchend', stopDrag);
 })();
