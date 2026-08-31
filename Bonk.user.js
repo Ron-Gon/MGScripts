@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bonk Bonk
 // @namespace    Violentmonkey
-// @version      1.0.4
+// @version      1.0.5
 // @description  Floating overlay with buttons, buttons simulates key presses
 // @author       AWON
 // @match        https://magicgarden.gg/r/*
@@ -11,10 +11,10 @@
 // @run-at       document-idle
 // ==/UserScript==
 
+
 (function() {
     'use strict';
 
-    // 1. Button configurations
     const buttonsConfig = [
         { label: 'Amber', color: '#FFBF00', textColor: '#000', key: '1' },
         { label: 'Dawn', color: '#8A2BE2', textColor: '#FFF', key: '5' },
@@ -24,7 +24,6 @@
         { label: 'Rain', color: '#104E8B', textColor: '#FFF', key: '6' }
     ];
 
-    // 2. Keyboard event dispatch function
     function triggerHotKey(keyChar) {
         const eventInit = {
             key: keyChar,
@@ -40,7 +39,7 @@
         document.dispatchEvent(new KeyboardEvent('keyup', eventInit));
     }
 
-    // 3. Create Container
+    // Create Container
     const container = document.createElement('div');
     container.id = 'vm-floating-overlay';
     Object.assign(container.style, {
@@ -58,11 +57,11 @@
         gap: '8px',
         fontFamily: 'system-ui, sans-serif',
         userSelect: 'none',
-        touchAction: 'none', // Prevents screen scrolling while dragging on touch devices
-        cursor: 'move'
+        webkitUserSelect: 'none',
+        touchAction: 'none'
     });
 
-    // 4. Create Buttons
+    // Create Buttons
     buttonsConfig.forEach(btnInfo => {
         const btn = document.createElement('button');
         btn.innerText = btnInfo.label;
@@ -76,71 +75,83 @@
             fontSize: '13px',
             cursor: 'pointer',
             boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-            transition: 'transform 0.1s, opacity 0.2s',
+            transition: 'transform 0.1s',
             outline: 'none',
             touchAction: 'manipulation'
         });
 
-        // Mouse click triggers
+        // Fire hotkey on tap/click
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             triggerHotKey(btnInfo.key);
         });
 
-        // Touch triggers for buttons
-        btn.addEventListener('touchstart', (e) => {
-            e.stopPropagation(); // Stops drag execution when tapping a button
-            btn.style.transform = 'scale(0.95)';
-        }, { passive: true });
-
-        btn.addEventListener('touchend', (e) => {
-            e.stopPropagation();
-            btn.style.transform = 'scale(1)';
-        }, { passive: true });
+        // Prevent dragging when tapping buttons
+        btn.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
+        btn.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
 
         container.appendChild(btn);
     });
 
     document.body.appendChild(container);
 
-    // 5. Combined Mouse & Touch Drag Logic
+    // Dynamic Touch & Mouse Drag Engine
     let isDragging = false;
-    let offsetX = 0, offsetY = 0;
+    let startX = 0, startY = 0;
+    let initialLeft = 0, initialTop = 0;
 
-    function getPointerPosition(e) {
-        return e.touches ? e.touches[0] : e;
-    }
+    function onPointerDown(e) {
+        // Only accept primary touch or left-click
+        if (e.type === 'mousedown' && e.button !== 0) return;
 
-    function startDrag(e) {
         isDragging = true;
-        const pointer = getPointerPosition(e);
-        offsetX = pointer.clientX - container.offsetLeft;
-        offsetY = pointer.clientY - container.offsetTop;
-    }
+        const pointer = e.touches ? e.touches[0] : e;
 
-    function moveDrag(e) {
-        if (!isDragging) return;
+        const rect = container.getBoundingClientRect();
         
-        // Prevent default screen scrolling on touch drag
-        if (e.type === 'touchmove') e.preventDefault(); 
+        // Convert right-aligned container to absolute left positioning on first drag
+        container.style.left = `${rect.left}px`;
+        container.style.top = `${rect.top}px`;
+        container.style.right = 'auto';
 
-        const pointer = getPointerPosition(e);
-        container.style.left = `${pointer.clientX - offsetX}px`;
-        container.style.top = `${pointer.clientY - offsetY}px`;
-        container.style.right = 'auto'; // Disable initial right alignment
+        startX = pointer.clientX;
+        startY = pointer.clientY;
+        initialLeft = rect.left;
+        initialTop = rect.top;
+
+        if (e.type === 'touchstart') {
+            e.preventDefault(); // Stop mobile scroll locking
+        }
     }
 
-    function stopDrag() {
+    function onPointerMove(e) {
+        if (!isDragging) return;
+
+        const pointer = e.touches ? e.touches[0] : e;
+        const deltaX = pointer.clientX - startX;
+        const deltaY = pointer.clientY - startY;
+
+        container.style.left = `${initialLeft + deltaX}px`;
+        container.style.top = `${initialTop + deltaY}px`;
+
+        if (e.cancelable) {
+            e.preventDefault();
+        }
+    }
+
+    function onPointerEnd() {
         isDragging = false;
     }
 
-    // Mouse listeners
-    container.addEventListener('mousedown', startDrag);
-    document.addEventListener('mousemove', moveDrag);
-    document.addEventListener('mouseup', stopDrag);
+    // Attach listener directly to container for start
+    container.addEventListener('mousedown', onPointerDown);
+    container.addEventListener('touchstart', onPointerDown, { passive: false });
 
-    // Touch listeners
-    container.addEventListener('touchstart', startDrag, { passive: false });
-    document.addEventListener('touchmove', moveDrag, { passive: false });
-    document.addEventListener('touchend', stopDrag);
+    // Attach global listeners for movement tracking
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('touchmove', onPointerMove, { passive: false });
+
+    window.addEventListener('mouseup', onPointerEnd);
+    window.addEventListener('touchend', onPointerEnd);
+    window.addEventListener('touchcancel', onPointerEnd);
 })();
