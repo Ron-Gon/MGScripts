@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Weather Pet Swap base
+// @name         Weather Pet Swap v2
 // @namespace    violentmonkey
 // @version      1.0.2
 // @description  Auto swap pet teams per weather via keybind with AriesMod
