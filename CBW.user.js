@@ -16,7 +16,7 @@
 
     // Target the notification button using its unique attribute
     const SELECTOR = 'button[data-notification-bell-widget="1"]';
-    const INTERVAL_MS = 2 * 60 * 1000; // 2 minutes in milliseconds
+    const INTERVAL_MS = 2000; // sec
 
     function clickBell() {
         const bellButton = document.querySelector(SELECTOR);
@@ -26,6 +26,6 @@
         }
     }
 
-    // Run periodically every 2 minutes
+    // Run periodically every 2 sec
     setInterval(clickBell, INTERVAL_MS);
 })();
