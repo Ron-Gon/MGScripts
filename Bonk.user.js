@@ -14,7 +14,7 @@
 (function() {
     'use strict';
 
-    // 1. Define button configurations with labels, colors, and key numbers
+    // 1. Button configurations
     const buttonsConfig = [
         { label: 'Amber', color: '#FFBF00', textColor: '#000', key: '1' },
         { label: 'Dawn', color: '#8A2BE2', textColor: '#FFF', key: '5' },
@@ -24,7 +24,7 @@
         { label: 'Rain', color: '#104E8B', textColor: '#FFF', key: '6' }
     ];
 
-    // 2. Function to dispatch simulated keyboard event (Ctrl + key)
+    // 2. Keyboard event simulator
     function triggerHotKey(keyChar) {
         const eventInit = {
             key: keyChar,
@@ -36,11 +36,8 @@
             cancelable: true
         };
 
-        const keyDown = new KeyboardEvent('keydown', eventInit);
-        const keyUp = new KeyboardEvent('keyup', eventInit);
-
-        document.dispatchEvent(keyDown);
-        document.dispatchEvent(keyUp);
+        document.dispatchEvent(new KeyboardEvent('keydown', eventInit));
+        document.dispatchEvent(new KeyboardEvent('keyup', eventInit));
     }
 
     // 3. Create Container
@@ -61,6 +58,7 @@
         gap: '8px',
         fontFamily: 'system-ui, sans-serif',
         userSelect: 'none',
+        touchAction: 'none', // Prevents page scrolling while dragging panel
         cursor: 'move'
     });
 
@@ -72,27 +70,42 @@
             backgroundColor: btnInfo.color,
             color: btnInfo.textColor,
             border: 'none',
-            padding: '10px 14px',
+            padding: '12px 16px',
             borderRadius: '6px',
             fontWeight: 'bold',
             fontSize: '13px',
             cursor: 'pointer',
             boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
             transition: 'transform 0.1s, opacity 0.2s',
-            outline: 'none'
+            outline: 'none',
+            touchAction: 'manipulation'
         });
 
-        btn.addEventListener('mouseenter', () => btn.style.opacity = '0.9');
-        btn.addEventListener('mouseleave', () => btn.style.opacity = '1.0');
-        btn.addEventListener('mousedown', (e) => {
-            e.stopPropagation(); // Prevents drag logic when clicking button
-            btn.style.transform = 'scale(0.95)';
-        });
-        btn.addEventListener('mouseup', () => btn.style.transform = 'scale(1)');
-
-        btn.addEventListener('click', (e) => {
+        // Click / Tap Action
+        const handleAction = (e) => {
             e.stopPropagation();
             triggerHotKey(btnInfo.key);
+        };
+
+        btn.addEventListener('click', handleAction);
+        
+        // Visual press feedback
+        btn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            btn.style.transform = 'scale(0.95)';
+        }, { passive: true });
+
+        btn.addEventListener('touchend', () => {
+            btn.style.transform = 'scale(1)';
+        }, { passive: true });
+
+        btn.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            btn.style.transform = 'scale(0.95)';
+        });
+        
+        btn.addEventListener('mouseup', () => {
+            btn.style.transform = 'scale(1)';
         });
 
         container.appendChild(btn);
@@ -100,24 +113,56 @@
 
     document.body.appendChild(container);
 
-    // 5. Add Drag-and-Drop functionality
+    // 5. Combined Mouse & Touch Drag Logic
     let isDragging = false;
-    let offsetX = 0, offsetY = 0;
+    let startX = 0, startY = 0;
+    let initialLeft = 0, initialTop = 0;
 
-    container.addEventListener('mousedown', (e) => {
+    const getCoords = (e) => e.touches ? e.touches[0] : e;
+
+    const dragStart = (e) => {
         isDragging = true;
-        offsetX = e.clientX - container.offsetLeft;
-        offsetY = e.clientY - container.offsetTop;
-    });
+        const coords = getCoords(e);
+        
+        // Cache initial positions
+        const rect = container.getBoundingClientRect();
+        initialLeft = rect.left;
+        initialTop = rect.top;
 
-    document.addEventListener('mousemove', (e) => {
+        startX = coords.clientX;
+        startY = coords.clientY;
+
+        // Convert positioning from right-anchored to left-anchored seamlessly
+        container.style.left = `${initialLeft}px`;
+        container.style.top = `${initialTop}px`;
+        container.style.right = 'auto';
+    };
+
+    const dragMove = (e) => {
         if (!isDragging) return;
-        container.style.left = `${e.clientX - offsetX}px`;
-        container.style.top = `${e.clientY - offsetY}px`;
-        container.style.right = 'auto'; // Reset right anchor once dragged
-    });
+        
+        // Prevent default screen scrolling during touch drag
+        if (e.touches) e.preventDefault();
 
-    document.addEventListener('mouseup', () => {
+        const coords = getCoords(e);
+        const deltaX = coords.clientX - startX;
+        const deltaY = coords.clientY - startY;
+
+        container.style.left = `${initialLeft + deltaX}px`;
+        container.style.top = `${initialTop + deltaY}px`;
+    };
+
+    const dragEnd = () => {
         isDragging = false;
-    });
+    };
+
+    // Mouse Listeners
+    container.addEventListener('mousedown', dragStart);
+    document.addEventListener('mousemove', dragMove);
+    document.addEventListener('mouseup', dragEnd);
+
+    // Touch Listeners
+    container.addEventListener('touchstart', dragStart, { passive: false });
+    document.addEventListener('touchmove', dragMove, { passive: false });
+    document.addEventListener('touchend', dragEnd);
 })();
