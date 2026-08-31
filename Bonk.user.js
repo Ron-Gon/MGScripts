@@ -8,6 +8,7 @@
 // @downloadURL  https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/Bonk.user.js
 // @uploadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/Bonk.user.js
 // @grant        none
+// @run-at       document-idle
 // ==/UserScript==
 
 (function() {
