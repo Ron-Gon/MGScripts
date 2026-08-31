@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bonk Bonk
 // @namespace    Violentmonkey
-// @version      1.0.5
+// @version      1.0.6
 // @description  Floating overlay with buttons, buttons simulates key presses
 // @author       AWON
 // @match        https://magicgarden.gg/r/*
@@ -10,7 +10,6 @@
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
-
 
 (function() {
     'use strict';
@@ -39,7 +38,7 @@
         document.dispatchEvent(new KeyboardEvent('keyup', eventInit));
     }
 
-    // Create Container
+    // Main Container
     const container = document.createElement('div');
     container.id = 'vm-floating-overlay';
     Object.assign(container.style, {
@@ -47,18 +46,41 @@
         top: '20px',
         right: '20px',
         zIndex: '999999',
-        backgroundColor: 'rgba(20, 20, 20, 0.85)',
+        backgroundColor: 'rgba(20, 20, 20, 0.9)',
         backdropFilter: 'blur(8px)',
-        padding: '12px',
+        padding: '10px 12px 12px 12px',
         borderRadius: '12px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        display: 'flex',
+        flexDirection: 'column',
         gap: '8px',
         fontFamily: 'system-ui, sans-serif',
         userSelect: 'none',
         webkitUserSelect: 'none',
+        touchAction: 'none' // Prevents touch scrolling
+    });
+
+    // Dedicated Drag Handle Bar (Top)
+    const dragHandle = document.createElement('div');
+    dragHandle.innerText = '::: DRAG PANEL :::';
+    Object.assign(dragHandle.style, {
+        color: '#888',
+        fontSize: '10px',
+        fontWeight: 'bold',
+        textAlign: 'center',
+        padding: '4px 0',
+        cursor: 'grab',
+        letterSpacing: '1px',
         touchAction: 'none'
+    });
+    container.appendChild(dragHandle);
+
+    // Button Grid Container
+    const grid = document.createElement('div');
+    Object.assign(grid.style, {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: '8px'
     });
 
     // Create Buttons
@@ -69,89 +91,84 @@
             backgroundColor: btnInfo.color,
             color: btnInfo.textColor,
             border: 'none',
-            padding: '12px 16px',
-            borderRadius: '6px',
+            padding: '14px 18px', // Larger touch target
+            borderRadius: '8px',
             fontWeight: 'bold',
-            fontSize: '13px',
+            fontSize: '14px',
             cursor: 'pointer',
             boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-            transition: 'transform 0.1s',
             outline: 'none',
             touchAction: 'manipulation'
         });
 
-        // Fire hotkey on tap/click
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
+        // Trigger on pointerdown to make tap execution feel immediate on mobile
+        btn.addEventListener('pointerdown', (e) => {
+            e.stopPropagation(); // Stop drag event from firing
+            btn.style.transform = 'scale(0.92)';
             triggerHotKey(btnInfo.key);
         });
 
-        // Prevent dragging when tapping buttons
-        btn.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
-        btn.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
+        btn.addEventListener('pointerup', () => {
+            btn.style.transform = 'scale(1)';
+        });
 
-        container.appendChild(btn);
+        grid.appendChild(btn);
     });
 
+    container.appendChild(grid);
     document.body.appendChild(container);
 
-    // Dynamic Touch & Mouse Drag Engine
+    // Modern Pointer-Based Touch Drag Logic
     let isDragging = false;
+    let activePointerId = null;
     let startX = 0, startY = 0;
     let initialLeft = 0, initialTop = 0;
 
     function onPointerDown(e) {
-        // Only accept primary touch or left-click
-        if (e.type === 'mousedown' && e.button !== 0) return;
-
+        // Track the pointer performing the touch
         isDragging = true;
-        const pointer = e.touches ? e.touches[0] : e;
+        activePointerId = e.pointerId;
+
+        // Lock all movement events to the container (even if finger drifts outside)
+        container.setPointerCapture(e.pointerId);
 
         const rect = container.getBoundingClientRect();
-        
-        // Convert right-aligned container to absolute left positioning on first drag
         container.style.left = `${rect.left}px`;
         container.style.top = `${rect.top}px`;
         container.style.right = 'auto';
 
-        startX = pointer.clientX;
-        startY = pointer.clientY;
+        startX = e.clientX;
+        startY = e.clientY;
         initialLeft = rect.left;
         initialTop = rect.top;
 
-        if (e.type === 'touchstart') {
-            e.preventDefault(); // Stop mobile scroll locking
-        }
+        dragHandle.style.cursor = 'grabbing';
     }
 
     function onPointerMove(e) {
-        if (!isDragging) return;
+        if (!isDragging || e.pointerId !== activePointerId) return;
 
-        const pointer = e.touches ? e.touches[0] : e;
-        const deltaX = pointer.clientX - startX;
-        const deltaY = pointer.clientY - startY;
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
 
         container.style.left = `${initialLeft + deltaX}px`;
         container.style.top = `${initialTop + deltaY}px`;
+    }
 
-        if (e.cancelable) {
-            e.preventDefault();
+    function onPointerUp(e) {
+        if (e.pointerId === activePointerId) {
+            isDragging = false;
+            activePointerId = null;
+            try {
+                container.releasePointerCapture(e.pointerId);
+            } catch(err) {}
+            dragHandle.style.cursor = 'grab';
         }
     }
 
-    function onPointerEnd() {
-        isDragging = false;
-    }
-
-    // Attach listener directly to container for start
-    container.addEventListener('mousedown', onPointerDown);
-    container.addEventListener('touchstart', onPointerDown, { passive: false });
-
-    // Attach global listeners for movement tracking
-    window.addEventListener('mousemove', onPointerMove);
-    window.addEventListener('touchmove', onPointerMove, { passive: false });
-
-    window.addEventListener('mouseup', onPointerEnd);
-    window.addEventListener('touchend', onPointerEnd);
-    window.addEventListener('touchcancel', onPointerEnd);
+    // Attach pointer events to both the container and drag handle
+    container.addEventListener('pointerdown', onPointerDown);
+    container.addEventListener('pointermove', onPointerMove);
+    container.addEventListener('pointerup', onPointerUp);
+    container.addEventListener('pointercancel', onPointerUp);
 })();
