@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Auto Click Notification Bell
 // @namespace    Violentmonkey
-// @version      1.0.2
+// @version      1.0.3
 // @description  Automatically clicks the notification bell button
 // @author       AWON & Gemini
 // @match        https://magicgarden.gg/r/*
@@ -16,37 +16,68 @@
 
     const INTERVAL_MS = 2000; // 2 sec
 
-    function findBellButton() {
-        // 1. Primary check: Custom widget attribute or aria-label
-        let button = document.querySelector('button[data-notification-bell-widget="1"], button[aria-label="Notifications"]');
-        if (button) return button;
+    // Deep search through light DOM and Shadow DOMs
+    function findBellDeep(root = document) {
+        // Direct attribute match
+        let target = root.querySelector('button[data-notification-bell-widget="1"], button[title="Notifications"], button[aria-label="Notifications"]');
+        if (target) return target;
 
-        // 2. Fallback check: Search all elements containing the 🔔 emoji directly
-        const allElements = document.querySelectorAll('button, span, div');
-        for (const el of allElements) {
-            if (el.textContent.includes('🔔')) {
-                // Return the element itself or its closest clickable parent button
+        // Search text for 🔔 emoji
+        const candidates = root.querySelectorAll('button, div, span');
+        for (const el of candidates) {
+            if (el.shadowRoot) {
+                const foundInShadow = findBellDeep(el.shadowRoot);
+                if (foundInShadow) return foundInShadow;
+            }
+            if (el.children.length === 0 && el.textContent.includes('🔔')) {
                 return el.closest('button') || el;
             }
         }
         return null;
     }
 
-    function clickBell() {
-        const target = findBellButton();
-        if (target) {
-            // Dispatch both click methods to trigger handlers attached via React/Vue
-            target.click();
-            target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-            console.log(`[Auto Clicker] Bell clicked successfully at ${new Date().toLocaleTimeString()}`);
-        } else {
-            console.warn('[Auto Clicker] Bell element not found on page.');
+    // Fully simulate natural user click sequence
+    function simulateFullClick(element) {
+        const rect = element.getBoundingClientRect();
+        const clientX = rect.left + rect.width / 2;
+        const clientY = rect.top + rect.height / 2;
+
+        const eventOptions = {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            clientX: clientX,
+            clientY: clientY,
+            pointerId: 1,
+            pointerType: 'mouse',
+            isPrimary: true
+        };
+
+        // Dispatch complete sequence: Pointer -> Mouse -> Touch (if needed)
+        element.dispatchEvent(new PointerEvent('pointerdown', eventOptions));
+        element.dispatchEvent(new MouseEvent('mousedown', eventOptions));
+        element.dispatchEvent(new PointerEvent('pointerup', eventOptions));
+        element.dispatchEvent(new MouseEvent('mouseup', eventOptions));
+        element.dispatchEvent(new MouseEvent('click', eventOptions));
+
+        if (typeof element.click === 'function') {
+            element.click();
         }
     }
 
-    // Delay initial start slightly to let dynamic frames render, then run every 2 mins
-    setTimeout(() => {
-        clickBell();
-        setInterval(clickBell, INTERVAL_MS);
-    }, 3000);
+    function executeClick() {
+        const bell = findBellDeep();
+        if (bell) {
+            simulateFullClick(bell);
+            console.log(`[Auto Clicker] Bell trigger fired at ${new Date().toLocaleTimeString()}`);
+        } else {
+            console.warn('[Auto Clicker] Bell element was not found in active DOM/Shadow DOM.');
+        }
+    }
+
+    // Run every 2 minutes
+    setInterval(executeClick, INTERVAL_MS);
+    
+    // First trigger 3 seconds after load
+    setTimeout(executeClick, 5000);
 })();
