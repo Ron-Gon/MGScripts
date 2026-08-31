@@ -7,8 +7,8 @@
 // @match        https://magicgarden.gg/r/*
 // @run-at       document-idle
 // @grant        none
-//downloadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/CBW.user.js
-//uploadURL      https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/CBS.user.js
+//@downloadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/CBW.user.js
+//@uploadURL      https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/CBS.user.js
 // ==/UserScript==
 
 (function () {
