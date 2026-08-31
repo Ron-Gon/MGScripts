@@ -69,6 +69,3 @@
   // Expose function globally for manual testing in Eruda Console via `window.buyAll()`
   window.buyAll = clickAllBuyAllButtons;
 })();
-
-
-Can you make it that it clicks one "Buy All" button at a time? With a interval of 900ms?
