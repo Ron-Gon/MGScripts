@@ -1,29 +1,26 @@
 // ==UserScript==
-// @name         Weather Pet Swap
+// @name         Weather Pet Swap base
 // @namespace    violentmonkey
-// @version      1.0.3
+// @version      1.0.2
 // @description  Auto swap pet teams per weather via keybind with AriesMod
 // @author       AWON Gemini
 // @match        https://magiccircle.gg/r/*
 // @match        https://magicgarden.gg/r/*
 // @match        https://starweaver.org/r/*
-// @grant        none
 // @uploadURL    https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS.user.js
 // @downloadURL  https://raw.githubusercontent.com/Ron-Gon/MGScripts/main/WPS.user.js
+// @grant        none
 // ==/UserScript==
 
 (function () {
   'use strict';
 
-  const SSE_STREAM_URL = 'https://mg-api.ariedam.fr/live/weather';
+  const SSE_STREAM_URL = 'https://mg-api.ariedam.fr/live/weather/stream';
 
   const KEY_MAPPING = {
     'Amber Moon': '1',
-    'AmberMoon': '1',
     'Snow': '2',
-    'Frost': '2',
     'Thunderstorm': '3',
-    'null': '4',
     'Clear Skies': '4',
     'Dawn': '5',
     'Rain': '4'
@@ -315,4 +312,3 @@
   createOverlayUI();
   connectStream();
 })();
-
