@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Auto Buyer
 // @namespace    Violentmonkey
-// @version      1.1.0
+// @version      1.1.3
 // @description  Auto Buy Alarmed Items
 // @author       Awon & Gemini
 // @match        https://magiccircle.gg/r/*
