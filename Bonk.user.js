@@ -15,12 +15,12 @@
     'use strict';
 
     const buttonsConfig = [
-        { label: 'Amber', color: '#FFBF00', textColor: '#000', key: '1' },
-        { label: 'Dawn', color: '#8A2BE2', textColor: '#FFF', key: '5' },
-        { label: 'Snow', color: '#E0F7FA', textColor: '#000', key: '2' },
-        { label: 'Thunder', color: '#00F5FF', textColor: '#000', key: '3' },
-        { label: 'Clear', color: '#00BFFF', textColor: '#FFF', key: '4' },
-        { label: 'Rain', color: '#104E8B', textColor: '#FFF', key: '6' }
+        { label: '🌅 Amber', color: '#FFBF00', textColor: '#000', key: '1' },
+        { label: '🌌 Dawn', color: '#8A2BE2', textColor: '#FFF', key: '5' },
+        { label: '❄️ Snow', color: '#E0F7FA', textColor: '#000', key: '2' },
+        { label: '🌩️ Thunder', color: '#00F5FF', textColor: '#000', key: '3' },
+        { label: '☀️ Clear', color: '#00BFFF', textColor: '#FFF', key: '4' },
+        { label: '🌧️ Rain', color: '#104E8B', textColor: '#FFF', key: '6' }
     ];
 
     function triggerHotKey(keyChar) {
