@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Auto Buyer
+// @name         Buyer All Get
 // @namespace    Violentmonkey
 // @version      1.0.0
 // @description  Auto Buy Alarmed Items
