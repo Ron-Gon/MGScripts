@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BuyAll & Click Bell Widget Integration 
 // @namespace    Violentmonkey
-// @version      1.2.0
+// @version      1.2.1
 // @description  Automatically clicks the notification bell button and buys all alerted Item
 // @author       AWON & Gemini
 // @match        https://magicgarden.gg/r/*
@@ -14,10 +14,16 @@
 (function () {
     'use strict';
 
-    const FIVE_MINUTES_MS = 5 * 60 * 1000; // 5 minutes
-    const ONE_SECOND_MS = 1000;            // 1 second delay between the two clicks
+    // Settings
+    const FIVE_MINUTES_MS = 5 * 60 * 1000;  // Bell timer interval (5 minutes)
+    const ONE_SECOND_MS = 1000;             // Delay between the 2 bell clicks
+    const WAIT_AFTER_BUY_ALL_MS = 900;      // Cooldown after clicking "Buy All" buttons
 
-    // Deep search through light DOM and Shadow DOMs
+    let isBuyAllProcessing = false;
+
+    // --- 1. BELL CLICKER MODULE ---
+
+    // Deep search through light DOM and Shadow DOMs for the bell button
     function findBellDeep(root = document) {
         let target = root.querySelector('button[data-notification-bell-widget="1"], button[title="Notifications"], button[aria-label="Notifications"]');
         if (target) return target;
@@ -69,79 +75,76 @@
         if (bell) {
             // First Click
             simulateFullClick(bell);
-            console.log(`[Auto Clicker] First click performed at ${new Date().toLocaleTimeString()}`);
+            console.log(`[Bell Clicker] First click performed at ${new Date().toLocaleTimeString()}`);
 
             // Second Click (1 second later)
             setTimeout(() => {
                 const recheckedBell = findBellDeep() || bell;
                 simulateFullClick(recheckedBell);
-                console.log(`[Auto Clicker] Second click performed at ${new Date().toLocaleTimeString()}`);
+                console.log(`[Bell Clicker] Second click performed at ${new Date().toLocaleTimeString()}`);
+
+                // Trigger buy-all check 500ms after the second click in case popup opened
+                setTimeout(clickAllBuyAllButtons, 500);
             }, ONE_SECOND_MS);
         } else {
-            console.warn('[Auto Clicker] Bell element not found.');
+            console.warn('[Bell Clicker] Bell element not found.');
         }
     }
 
-    // Run every 5 minutes
+
+    // --- 2. BUY ALL MODULE ---
+
+    // Helper to fetch all currently visible "Buy all" buttons
+    function getBuyAllButtons() {
+        return Array.from(document.querySelectorAll('button, div[role="button"], a'))
+            .filter(el => {
+                const text = el.innerText ? el.innerText.trim().toLowerCase() : '';
+                return text === 'buy all' && el.offsetWidth > 0 && el.offsetHeight > 0;
+            });
+    }
+
+    async function clickAllBuyAllButtons() {
+        if (isBuyAllProcessing) return;
+        isBuyAllProcessing = true;
+
+        let availableButtons = getBuyAllButtons();
+
+        while (availableButtons.length > 0) {
+            console.log(`[Buy All] Pressing all ${availableButtons.length} "Buy all" buttons...`);
+
+            // Press every single "Buy all" button immediately
+            availableButtons.forEach((btn, index) => {
+                console.log(`[Buy All] Pressing button #${index + 1}`);
+                btn.click();
+            });
+
+            // Wait cooldown period
+            await new Promise(resolve => setTimeout(resolve, WAIT_AFTER_BUY_ALL_MS));
+
+            // Re-scan for remaining/new buttons
+            availableButtons = getBuyAllButtons();
+        }
+
+        isBuyAllProcessing = false;
+    }
+
+
+    // --- 3. INITIALIZATION & OBSERVERS ---
+
+    // Watch DOM for dynamic popups appearing with "Buy all" buttons
+    const observer = new MutationObserver(() => {
+        const buttons = getBuyAllButtons();
+        if (buttons.length > 0 && !isBuyAllProcessing) {
+            clickAllBuyAllButtons();
+        }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Timers for Bell sequence
     setInterval(performDoubleTapSequence, FIVE_MINUTES_MS);
+    setTimeout(performDoubleTapSequence, 5000); // Initial start 5s after load
 
-    // Initial run 5 seconds after page load
-    setTimeout(performDoubleTapSequence, 5000);
-})();
-
-(function () {
-  'use strict';
-
-  const WAIT_AFTER_CLICKING_ALL_MS = 900; // Delay in ms after pressing all buttons
-  let isProcessing = false;
-
-  // Helper to fetch all currently visible "Buy all" buttons
-  function getBuyAllButtons() {
-    return Array.from(document.querySelectorAll('button, div[role="button"], a'))
-      .filter(el => {
-        const text = el.innerText ? el.innerText.trim().toLowerCase() : '';
-        return text === 'buy all' && el.offsetWidth > 0 && el.offsetHeight > 0;
-      });
-  }
-
-  async function clickAllBuyAllButtons() {
-    if (isProcessing) return;
-    isProcessing = true;
-
-    let availableButtons = getBuyAllButtons();
-
-    while (availableButtons.length > 0) {
-      console.log(`[Script] Pressing all ${availableButtons.length} "Buy all" buttons...`);
-
-      // Press every single "Buy all" button immediately
-      availableButtons.forEach((btn, index) => {
-        console.log(`[Script] Pressing button #${index + 1}`);
-        btn.click();
-      });
-
-      // Wait 900ms after pressing all of them
-      console.log(`[Script] Waiting ${WAIT_AFTER_CLICKING_ALL_MS}ms...`);
-      await new Promise(resolve => setTimeout(resolve, WAIT_AFTER_CLICKING_ALL_MS));
-
-      // Re-scan to see if any new/remaining "Buy all" buttons are still on screen
-      availableButtons = getBuyAllButtons();
-    }
-
-    console.log('[Script] All "Buy all" buttons pressed.');
-    isProcessing = false;
-  }
-
-  // Watch DOM for when the popup appears
-  const observer = new MutationObserver(() => {
-    const buttons = getBuyAllButtons();
-
-    if (buttons.length > 0 && !isProcessing) {
-      clickAllBuyAllButtons();
-    }
-  });
-
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  // Expose function globally for manual testing in Eruda Console via `window.buyAll()`
-  window.buyAll = clickAllBuyAllButtons;
+    // Expose window.buyAll() for manual testing via console/Eruda
+    window.buyAll = clickAllBuyAllButtons;
 })();
