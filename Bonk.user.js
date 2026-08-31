@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bonk Bonk
 // @namespace    Violentmonkey
-// @version      1.0.0
+// @version      1.0.3
 // @description  Floating overlay with buttons, buttons simulates key presses
 // @author       AWON
 // @match        https://magicgarden.gg/r/*
