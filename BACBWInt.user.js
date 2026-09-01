@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BuyAll & Click Bell Widget Integration 
 // @namespace    Violentmonkey
-// @version      1.2.1
+// @version      1.2.2
 // @description  Automatically clicks the notification bell button and buys all alerted Item
 // @author       AWON & Gemini
 // @match        https://magicgarden.gg/r/*
@@ -15,7 +15,7 @@
     'use strict';
 
     // Settings
-    const FIVE_MINUTES_MS = 2000;  // Bell timer interval (5 minutes)
+    const FIVE_MINUTES_MS = 60000;  // Bell timer interval (5 minutes)
     const ONE_SECOND_MS = 1000;             // Delay between the 2 bell clicks
     const WAIT_AFTER_BUY_ALL_MS = 900;      // Cooldown after clicking "Buy All" buttons
 
