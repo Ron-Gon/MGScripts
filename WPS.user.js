@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Weather Pet Swap v2
 // @namespace    violentmonkey
-// @version      1.0.2
+// @version      1.0.3
 // @description  Auto swap pet teams per weather via keybind with AriesMod
 // @author       AWON Gemini
 // @match        https://magiccircle.gg/r/*
@@ -275,40 +275,53 @@
     target.dispatchEvent(new KeyboardEvent('keyup', keyData));
   }
 
-  /**
-   * Connect to the SSE endpoint and listen for weather events.
+    /**
+   * Connects to the SSE endpoint and forces a refresh every 30 seconds.
    */
   function connectStream() {
-    const eventSource = new EventSource(SSE_STREAM_URL);
+    let eventSource = null;
 
-    eventSource.addEventListener('weather', (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        const weatherType = payload.weather;
-        const keyDigit = KEY_MAPPING[weatherType];
-
-        if (!isEnabled) {
-          updateLog(`[Activate] ${weatherType}`);
-          return;
-        }
-
-        if (keyDigit) {
-          updateLog(`🌦️ ${weatherType} (Ctrl+${keyDigit})`);
-          triggerCtrlKeypress(keyDigit);
-        } else {
-          updateLog(`❓ ${weatherType} (No Key)`);
-        }
-      } catch (err) {
-        console.error('[Weather Stream] Failed to parse payload:', err);
+    function initEventSource() {
+      // Close any existing connection before opening a new one
+      if (eventSource) {
+        eventSource.close();
       }
-    });
 
-    eventSource.onerror = () => {
-      updateLog('⚠️ Reconnecting...');
-    };
+      eventSource = new EventSource(SSE_STREAM_URL);
+
+      eventSource.addEventListener('weather', (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          const weatherType = payload.weather;
+          const keyDigit = KEY_MAPPING[weatherType];
+
+          if (!isEnabled) {
+            updateLog(`[Paused] ${weatherType}`);
+            return;
+          }
+
+          if (keyDigit) {
+            updateLog(`🌦️ ${weatherType} (Ctrl+${keyDigit})`);
+            triggerCtrlKeypress(keyDigit);
+          } else {
+            updateLog(`❓ ${weatherType} (No Key)`);
+          }
+        } catch (err) {
+          console.error('[Weather Stream] Failed to parse payload:', err);
+        }
+      });
+
+      eventSource.onerror = () => {
+        updateLog('⚠️ Reconnecting...');
+      };
+    }
+
+    // Initial connection
+    initEventSource();
+
+    // Force re-connect every 30 seconds (30,000 milliseconds)
+    setInterval(() => {
+      initEventSource();
+    }, 30000);
   }
 
-  // Initialize
-  createOverlayUI();
-  connectStream();
-})();
