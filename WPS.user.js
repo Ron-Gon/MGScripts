@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Weather Pet Swap v2
 // @namespace    violentmonkey
-// @version      1.0.3
+// @version      1.0.4
 // @description  Auto swap pet teams per weather via keybind with AriesMod
 // @author       AWON Gemini
 // @match        https://magiccircle.gg/r/*
@@ -325,3 +325,8 @@
     }, 30000);
   }
 
+
+  // Initialize
+  createOverlayUI();
+  connectStream();
+})();
