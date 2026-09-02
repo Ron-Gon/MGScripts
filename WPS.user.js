@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Weather Pet Swap v2
 // @namespace    violentmonkey
-// @version      1.0.4
+// @version      1.0.5
 // @description  Auto swap pet teams per weather via keybind with AriesMod
 // @author       AWON Gemini
 // @match        https://magiccircle.gg/r/*
@@ -319,7 +319,7 @@
     // Initial connection
     initEventSource();
 
-    // Force re-connect every 30 seconds (30,000 milliseconds)
+    // Force re-connect every 10 seconds (10,000 milliseconds)
     setInterval(() => {
       initEventSource();
     }, 10000);
