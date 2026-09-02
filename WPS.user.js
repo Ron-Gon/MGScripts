@@ -322,7 +322,7 @@
     // Force re-connect every 30 seconds (30,000 milliseconds)
     setInterval(() => {
       initEventSource();
-    }, 30000);
+    }, 10000);
   }
 
 
